@@ -32,6 +32,11 @@ const (
 	DefaultStockSize = 30
 )
 
+// maxActionRetries is the number of consecutive illegal actions allowed
+// before the game aborts. Generous enough for human typos, but prevents
+// infinite loops from buggy agents.
+const maxActionRetries = 1000
+
 // GameConfig holds the settings for a new game.
 type GameConfig struct {
 	NumPlayers int    // 2–6.
@@ -276,6 +281,7 @@ func (g *Game) PlayTurn() error {
 	g.drawUpToFive(ps)
 
 	// Step 2: Play loop — player makes actions until they discard or win.
+	retries := 0
 	for {
 		if g.gameOver {
 			return nil
@@ -284,13 +290,25 @@ func (g *Game) PlayTurn() error {
 		view := g.buildGameView(g.currentPlayer)
 		action, err := ps.Player.ChooseAction(view)
 		if err != nil {
+			// Player-level errors (disconnect, etc.) are fatal.
 			return fmt.Errorf("player %s error: %w", ps.Player.Name(), err)
 		}
 
 		if err := g.executeAction(g.currentPlayer, action); err != nil {
-			return fmt.Errorf("invalid action %s by %s: %w",
-				action, ps.Player.Name(), err)
+			// Illegal move — notify observers and let the player try again.
+			g.emit(GameEvent{
+				Type:        EventIllegalAction,
+				PlayerIndex: g.currentPlayer,
+				Message:     fmt.Sprintf("Illegal move: %v", err),
+			})
+			retries++
+			if retries > maxActionRetries {
+				return fmt.Errorf("player %s exceeded %d illegal action retries",
+					ps.Player.Name(), maxActionRetries)
+			}
+			continue
 		}
+		retries = 0 // Reset on successful action.
 
 		// If the player discarded, the turn is over.
 		if g.hasDiscarded {

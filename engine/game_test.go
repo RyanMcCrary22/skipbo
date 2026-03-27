@@ -251,6 +251,8 @@ func TestGame_RejectsPlayAfterDiscard(t *testing.T) {
 
 func TestGame_RejectsBadBuildingPileIndex(t *testing.T) {
 	// Try to play on building pile index 5 (only 0–3 exist).
+	// The engine should retry instead of crashing; the scripted player
+	// falls back to a valid discard after the illegal action.
 	p1 := NewScriptedPlayer("Alice", []Action{
 		{Source: SourceHand, SourceIndex: 0, Target: TargetBuild, TargetIndex: 5},
 	})
@@ -259,9 +261,19 @@ func TestGame_RejectsBadBuildingPileIndex(t *testing.T) {
 	cfg := GameConfig{NumPlayers: 2, StockSize: 10, Seed: 42}
 	game, _ := NewGame(cfg, []Player{p1, p2})
 
+	var gotIllegalEvent bool
+	game.OnEvent(func(e GameEvent) {
+		if e.Type == EventIllegalAction {
+			gotIllegalEvent = true
+		}
+	})
+
 	err := game.PlayTurn()
-	if err == nil {
-		t.Error("should reject building pile index 5")
+	if err != nil {
+		t.Fatalf("PlayTurn should succeed (retry on illegal move): %v", err)
+	}
+	if !gotIllegalEvent {
+		t.Error("should have emitted EventIllegalAction")
 	}
 }
 

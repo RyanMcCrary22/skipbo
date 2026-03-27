@@ -84,6 +84,7 @@ const (
 	EventTurnEnded                          // A player's turn ended.
 	EventHandRefilled                       // A player drew cards (hand was empty, got 5 more).
 	EventGameOver                           // The game ended.
+	EventIllegalAction                      // A player attempted an illegal action.
 )
 
 // GameEvent carries information about a state change.
