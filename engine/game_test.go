@@ -1,84 +1,11 @@
 package engine
 
 import (
-	"math/rand/v2"
 	"testing"
 )
 
 // ---------------------------------------------------------------------------
-// Mock player: plays randomly from valid actions
-// ---------------------------------------------------------------------------
-
-// RandomPlayer is an AI that picks random valid actions. Used for testing
-// that games terminate and all rules hold under random play.
-type RandomPlayer struct {
-	name string
-	rng  *rand.Rand
-}
-
-func NewRandomPlayer(name string, seed uint64) *RandomPlayer {
-	return &RandomPlayer{
-		name: name,
-		rng:  rand.New(rand.NewPCG(seed, 0)),
-	}
-}
-
-func (p *RandomPlayer) Name() string { return p.name }
-
-func (p *RandomPlayer) ChooseAction(view *GameView) (Action, error) {
-	// Collect all valid play actions first.
-	var plays []Action
-
-	// Try playing from stock to each building pile.
-	if view.StockTop != nil {
-		for i := 0; i < MaxBuildingPiles; i++ {
-			if view.StockTop.CanPlayOn(view.BuildingPiles[i].NextNeeded) {
-				plays = append(plays, PlayFromStock(i))
-			}
-		}
-	}
-
-	// Try playing from hand to each building pile.
-	for hi, card := range view.Hand {
-		for bi := 0; bi < MaxBuildingPiles; bi++ {
-			if card.CanPlayOn(view.BuildingPiles[bi].NextNeeded) {
-				plays = append(plays, PlayFromHand(hi, bi))
-			}
-		}
-	}
-
-	// Try playing from discard tops to each building pile.
-	for di := 0; di < MaxDiscardPiles; di++ {
-		pile := view.DiscardPiles[di]
-		if len(pile) == 0 {
-			continue
-		}
-		top := pile[len(pile)-1]
-		for bi := 0; bi < MaxBuildingPiles; bi++ {
-			if top.CanPlayOn(view.BuildingPiles[bi].NextNeeded) {
-				plays = append(plays, PlayFromDiscard(di, bi))
-			}
-		}
-	}
-
-	// If we have valid plays, pick one at random (prefer stock plays).
-	if len(plays) > 0 {
-		return plays[p.rng.IntN(len(plays))], nil
-	}
-
-	// No valid plays — must discard from hand.
-	if len(view.Hand) > 0 {
-		handIdx := p.rng.IntN(len(view.Hand))
-		discIdx := p.rng.IntN(MaxDiscardPiles)
-		return DiscardFromHand(handIdx, discIdx), nil
-	}
-
-	// Should not happen if game logic is correct (hand is always refilled).
-	return DiscardFromHand(0, 0), nil
-}
-
-// ---------------------------------------------------------------------------
-// ScriptedPlayer: replays a fixed sequence of actions
+// ScriptedPlayer: replays a fixed sequence of actions (test helper)
 // ---------------------------------------------------------------------------
 
 // ScriptedPlayer replays a predefined list of actions. Useful for
