@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	text "github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -55,6 +56,11 @@ type GameScreen struct {
 
 	// Game over state.
 	gameOverMsg string
+
+	// Animation state for visualizing moves.
+	lastAction       *engine.Action
+	lastActionPlayer int
+	lastActionTime   time.Time
 }
 
 // NewGameScreen creates a new GUI game screen.
@@ -261,6 +267,15 @@ func (gs *GameScreen) SetGameOver(msg string) {
 	gs.gameOverMsg = msg
 }
 
+func (gs *GameScreen) SetLastAction(a *engine.Action, playerIdx int) {
+	if a == nil {
+		return
+	}
+	gs.lastAction = a
+	gs.lastActionPlayer = playerIdx
+	gs.lastActionTime = time.Now()
+}
+
 // ---------------------------------------------------------------------------
 // Ebitengine interface: Draw
 // ---------------------------------------------------------------------------
@@ -285,6 +300,7 @@ func (gs *GameScreen) Draw(screen *ebiten.Image) {
 	gs.drawStock(screen, view)
 	gs.drawHand(screen, view)
 	gs.drawDiscards(screen, view)
+	gs.drawArrow(screen, view)
 	gs.drawStatus(screen)
 }
 
@@ -420,4 +436,91 @@ func (gs *GameScreen) drawStatus(screen *ebiten.Image) {
 
 func (gs *GameScreen) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return ScreenWidth, ScreenHeight
+}
+
+// ---------------------------------------------------------------------------
+// Animations
+// ---------------------------------------------------------------------------
+
+func (gs *GameScreen) drawArrow(screen *ebiten.Image, view *engine.GameView) {
+	if gs.lastAction == nil {
+		return
+	}
+	// Fade out arrow after 2 seconds
+	elapsed := time.Since(gs.lastActionTime)
+	alpha := 255 - int(elapsed.Seconds()*128)
+	if alpha <= 0 {
+		return
+	}
+	if alpha > 255 {
+		alpha = 255
+	}
+	
+	var x1, y1, x2, y2 float32
+	
+	// Target
+	if gs.lastAction.Target == engine.TargetBuild {
+		x2 = buildPileX(gs.lastAction.TargetIndex) + CardWidth/2
+		y2 = buildPileY + CardHeight/2
+	} else {
+		if gs.lastActionPlayer == view.PlayerIndex {
+			x2 = discardX(gs.lastAction.TargetIndex) + CardWidth/2
+			y2 = discardY + CardHeight/2
+		} else {
+			oppIdx := gs.getOpponentViewIndex(gs.lastActionPlayer, view)
+			if oppIdx >= 0 {
+				ox := opponentX(oppIdx, len(view.Opponents))
+				x2 = ox + float32(gs.lastAction.TargetIndex)*16 + 7
+				y2 = float32(opponentY) + CardHeight + 18 + 9
+			}
+		}
+	}
+	
+	// Source
+	if gs.lastActionPlayer == view.PlayerIndex {
+		switch gs.lastAction.Source {
+		case engine.SourceHand:
+			x1 = handCardX(gs.lastAction.SourceIndex, len(view.Hand)) + CardWidth/2
+			y1 = handCardY + CardHeight/2
+		case engine.SourceStock:
+			x1 = stockX + CardWidth/2
+			y1 = stockY + CardHeight/2
+		case engine.SourceDiscard:
+			x1 = discardX(gs.lastAction.SourceIndex) + CardWidth/2
+			y1 = discardY + CardHeight/2
+		}
+	} else {
+		oppIdx := gs.getOpponentViewIndex(gs.lastActionPlayer, view)
+		if oppIdx >= 0 {
+			ox := opponentX(oppIdx, len(view.Opponents))
+			switch gs.lastAction.Source {
+			case engine.SourceHand: 
+				x1 = float32(ox) + CardWidth + 8
+				y1 = float32(opponentY) + 30
+			case engine.SourceStock:
+				x1 = float32(ox) + CardWidth/2
+				y1 = float32(opponentY) + 10 + CardHeight/2
+			case engine.SourceDiscard:
+				x1 = ox + float32(gs.lastAction.SourceIndex)*16 + 7
+				y1 = float32(opponentY) + CardHeight + 18 + 9
+			}
+		}
+	}
+	
+	if x1 == 0 && y1 == 0 {
+		return
+	}
+	
+	c := color.RGBA{0xFF, 0x8C, 0x00, uint8(alpha)}
+	vector.StrokeLine(screen, x1, y1, x2, y2, 6, c, true)
+	vector.DrawFilledCircle(screen, x2, y2, 12, c, true)
+}
+
+func (gs *GameScreen) getOpponentViewIndex(playerIdx int, view *engine.GameView) int {
+	if playerIdx < view.PlayerIndex {
+		return playerIdx
+	} else if playerIdx > view.PlayerIndex {
+		return playerIdx - 1
+	}
+	return -1
 }

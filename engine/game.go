@@ -441,6 +441,7 @@ func (g *Game) placeCard(ps *PlayerState, a Action, card Card) error {
 			PlayerIndex: g.currentPlayer,
 			Card:        &card,
 			PileIndex:   a.TargetIndex,
+			Action:      &a,
 			Message:     fmt.Sprintf("%s plays %s on building pile %d", ps.Player.Name(), card, a.TargetIndex),
 		})
 
@@ -470,6 +471,7 @@ func (g *Game) placeCard(ps *PlayerState, a Action, card Card) error {
 			PlayerIndex: g.currentPlayer,
 			Card:        &card,
 			PileIndex:   a.TargetIndex,
+			Action:      &a,
 			Message:     fmt.Sprintf("%s discards %s to discard pile %d", ps.Player.Name(), card, a.TargetIndex),
 		})
 		return nil

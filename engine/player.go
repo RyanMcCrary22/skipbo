@@ -94,5 +94,6 @@ type GameEvent struct {
 	PlayerIndex int       // Which player is involved.
 	Card        *Card     // The card involved (if applicable).
 	PileIndex   int       // Which pile (building or discard) is involved.
+	Action      *Action   // Optional: The action that triggered this event.
 	Message     string    // Human-readable description.
 }
