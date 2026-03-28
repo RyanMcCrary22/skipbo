@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -24,6 +25,7 @@ type SelectionPhase int
 const (
 	PhaseSelectSource SelectionPhase = iota // Waiting for source click.
 	PhaseSelectTarget                       // Source selected, waiting for target.
+	PhaseWait                               // Waiting on engine or opponent's turn.
 )
 
 // SelectedSource records what was clicked as the card source.
@@ -43,6 +45,8 @@ type GameScreen struct {
 	// Channel-based communication with the engine goroutine.
 	viewCh   chan *engine.GameView
 	actionCh chan engine.Action
+
+	mu sync.Mutex // Protects the UI state below
 
 	// Current state.
 	currentView  *engine.GameView
@@ -129,15 +133,20 @@ func (gs *GameScreen) Update() error {
 	// Check for new view from game goroutine.
 	select {
 	case view := <-gs.viewCh:
+		gs.mu.Lock()
 		gs.currentView = view
 		gs.phase = PhaseSelectSource
 		gs.selected = nil
 		gs.statusMsg = "Your turn — click a card to play"
 		gs.statusColor = colorStatusText
+		gs.mu.Unlock()
 	default:
 	}
 
-	if gs.currentView == nil || gs.gameOverMsg != "" {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+
+	if gs.currentView == nil || gs.gameOverMsg != "" || gs.phase == PhaseWait {
 		return nil
 	}
 
@@ -249,8 +258,7 @@ func (gs *GameScreen) handleTargetClick(mx, my float32) {
 
 func (gs *GameScreen) sendAction(action engine.Action) {
 	gs.actionCh <- action
-	gs.currentView = nil
-	gs.phase = PhaseSelectSource
+	gs.phase = PhaseWait
 	gs.selected = nil
 	gs.statusMsg = "Waiting..."
 	gs.statusColor = colorDimText
@@ -258,19 +266,31 @@ func (gs *GameScreen) sendAction(action engine.Action) {
 
 // SetError sets the error message (called from the game event handler).
 func (gs *GameScreen) SetError(msg string) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
 	gs.statusMsg = msg
 	gs.statusColor = colorError
 }
 
 // SetGameOver sets the game over message.
 func (gs *GameScreen) SetGameOver(msg string) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
 	gs.gameOverMsg = msg
+}
+
+func (gs *GameScreen) UpdateState(view *engine.GameView) {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	gs.currentView = view
 }
 
 func (gs *GameScreen) SetLastAction(a *engine.Action, playerIdx int) {
 	if a == nil {
 		return
 	}
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
 	gs.lastAction = a
 	gs.lastActionPlayer = playerIdx
 	gs.lastActionTime = time.Now()
@@ -284,6 +304,9 @@ func (gs *GameScreen) Draw(screen *ebiten.Image) {
 	// Felt background.
 	screen.Fill(colorFelt)
 
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+
 	if gs.gameOverMsg != "" {
 		DrawLabelCentered(screen, ScreenWidth/2, ScreenHeight/2, gs.gameOverMsg, 36, colorStatusText, gs.fontSrc)
 		return
@@ -291,7 +314,7 @@ func (gs *GameScreen) Draw(screen *ebiten.Image) {
 
 	view := gs.currentView
 	if view == nil {
-		DrawLabelCentered(screen, ScreenWidth/2, ScreenHeight/2, "Waiting for your turn...", 20, colorDimText, gs.fontSrc)
+		DrawLabelCentered(screen, ScreenWidth/2, ScreenHeight/2, "Loading game...", 20, colorDimText, gs.fontSrc)
 		return
 	}
 
@@ -315,9 +338,16 @@ func (gs *GameScreen) drawBuildingPiles(screen *ebiten.Image, view *engine.GameV
 		if bp.Size == 0 {
 			DrawEmptySlot(screen, bx, buildPileY, fmt.Sprintf("needs\n%d", bp.NextNeeded), colorBuild, gs.fontSrc)
 		} else {
-			// Create a temporary card for display.
-			c := engine.NewCard(bp.TopValue)
+			// Create a temporary card for display using the actual top card face.
+			c := engine.NewCard(bp.TopCard)
 			DrawCard(screen, bx, buildPileY, &c, highlighted, gs.fontSrc)
+			
+			// If it's a wild card, draw a badge showing what number it's acting as.
+			if bp.TopCard.IsWild() {
+				vector.DrawFilledRect(screen, bx+4, buildPileY+CardHeight-20, CardWidth-8, 14, color.RGBA{0, 0, 0, 200}, false)
+				label := fmt.Sprintf("as %d", bp.TopValue)
+				DrawLabelCentered(screen, float64(bx)+CardWidth/2, float64(buildPileY)+CardHeight-13, label, 10, colorStatusText, gs.fontSrc)
+			}
 		}
 		DrawPileCount(screen, bx, buildPileY, bp.Size, gs.fontSrc)
 	}

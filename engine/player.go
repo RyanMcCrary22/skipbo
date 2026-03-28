@@ -55,9 +55,10 @@ const MaxBuildingPiles = 4
 
 // BuildingPileView is a read-only view of a building pile.
 type BuildingPileView struct {
-	TopValue  CardValue // Effective top value (0 if empty).
+	TopValue   CardValue // Effective top value (0 if empty).
 	NextNeeded CardValue // The value needed to play on this pile.
-	Size      int       // Number of cards in the pile.
+	Size       int       // Number of cards in the pile.
+	TopCard    CardValue // The actual face value of the top card (so we know if it's Wild)
 }
 
 // OpponentView contains the visible information about another player.

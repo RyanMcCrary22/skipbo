@@ -175,7 +175,7 @@ func TestGame_BuildGameView(t *testing.T) {
 	// Give P1 some hand cards manually for a view test.
 	game.players[0].Hand.cards = []Card{NewCard(3), NewCard(7), NewCard(SkipBo)}
 
-	view := game.buildGameView(0)
+	view := game.BuildGameView(0)
 
 	if len(view.Hand) != 3 {
 		t.Errorf("view hand size = %d, want 3", len(view.Hand))

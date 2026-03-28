@@ -196,8 +196,8 @@ func (g *Game) PlayerName(index int) string {
 // GameView construction
 // ---------------------------------------------------------------------------
 
-// buildGameView creates a GameView snapshot for the given player index.
-func (g *Game) buildGameView(playerIdx int) *GameView {
+// BuildGameView creates a GameView snapshot for the given player index.
+func (g *Game) BuildGameView(playerIdx int) *GameView {
 	ps := &g.players[playerIdx]
 
 	view := &GameView{
@@ -222,10 +222,15 @@ func (g *Game) buildGameView(playerIdx int) *GameView {
 	// Building piles.
 	for i := 0; i < MaxBuildingPiles; i++ {
 		bp := &g.buildingPiles[i]
+		var topCard CardValue
+		if len(bp.cards) > 0 {
+			topCard = bp.cards[len(bp.cards)-1].Value
+		}
 		view.BuildingPiles[i] = BuildingPileView{
 			TopValue:   bp.TopValue(),
 			NextNeeded: bp.NextNeeded(),
 			Size:       bp.Len(),
+			TopCard:    topCard,
 		}
 	}
 
@@ -287,7 +292,7 @@ func (g *Game) PlayTurn() error {
 			return nil
 		}
 
-		view := g.buildGameView(g.currentPlayer)
+		view := g.BuildGameView(g.currentPlayer)
 		action, err := ps.Player.ChooseAction(view)
 		if err != nil {
 			// Player-level errors (disconnect, etc.) are fatal.
