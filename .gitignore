@@ -33,3 +33,9 @@ Thumbs.db
 # Build output
 bin/
 dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+python/runs/

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package skipbo;
+
+option go_package = "github.com/RyanMcCrary22/skipbo/proto/skipbopb";
+
+// SkipBoEnv exposes a Gym-style Step/Reset API for training RL agents.
+service SkipBoEnv {
+  // Reset starts a new game and returns the initial observation.
+  rpc Reset(ResetRequest) returns (Observation);
+
+  // Step executes one agent action and returns the resulting observation,
+  // reward, and done flag. Between agent turns, opponents play automatically.
+  rpc Step(StepRequest) returns (StepResult);
+
+  // GetMetrics returns cumulative training metrics from the server.
+  rpc GetMetrics(MetricsRequest) returns (MetricsResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response messages
+// ---------------------------------------------------------------------------
+
+message ResetRequest {
+  // Optional seed for deterministic games (0 = random).
+  uint64 seed = 1;
+  // Number of opponents (default 1 if not set).
+  int32 num_opponents = 2;
+  // Stock pile size (default 30 if not set).
+  int32 stock_size = 3;
+}
+
+message StepRequest {
+  // Discrete action index (0–59).
+  int32 action = 1;
+}
+
+message Observation {
+  // Flat state vector (length 54).
+  repeated double state = 1;
+  // Legal action mask (length 60). True = action is legal.
+  repeated bool action_mask = 2;
+}
+
+message StepResult {
+  // Observation after the action.
+  Observation obs = 1;
+  // Shaped reward for this step.
+  double reward = 2;
+  // Whether the game is over.
+  bool done = 3;
+  // Index of the winner (-1 if game not over).
+  int32 winner = 4;
+  // Additional info for logging.
+  StepInfo info = 5;
+}
+
+message StepInfo {
+  int32 turn_number = 1;
+  int32 agent_stock_remaining = 2;
+  bool played_from_stock = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+message MetricsRequest {}
+
+message MetricsResponse {
+  int64 total_games = 1;
+  int64 total_steps = 2;
+  int64 agent_wins = 3;
+  double avg_game_length = 4;
+  double avg_stockpile_plays = 5;
+  int64 illegal_actions = 6;
+}
