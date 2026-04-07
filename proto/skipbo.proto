@@ -7,7 +7,7 @@ option go_package = "github.com/RyanMcCrary22/skipbo/proto/skipbopb";
 // SkipBoEnv exposes a Gym-style Step/Reset API for training RL agents.
 service SkipBoEnv {
   // Reset starts a new game and returns the initial observation.
-  rpc Reset(ResetRequest) returns (Observation);
+  rpc Reset(ResetRequest) returns (ResetResponse);
 
   // Step executes one agent action and returns the resulting observation,
   // reward, and done flag. Between agent turns, opponents play automatically.
@@ -28,11 +28,19 @@ message ResetRequest {
   int32 num_opponents = 2;
   // Stock pile size (default 30 if not set).
   int32 stock_size = 3;
+  // Optional list of opponent model names. If provided, overrides num_opponents.
+  repeated string opponent_models = 4;
+}
+
+message ResetResponse {
+  string session_id = 1;
+  Observation obs = 2;
 }
 
 message StepRequest {
+  string session_id = 1;
   // Discrete action index (0–59).
-  int32 action = 1;
+  int32 action = 2;
 }
 
 message Observation {

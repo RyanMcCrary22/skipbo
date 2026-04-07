@@ -31,7 +31,7 @@ const (
 // SkipBoEnv exposes a Gym-style Step/Reset API for training RL agents.
 type SkipBoEnvClient interface {
 	// Reset starts a new game and returns the initial observation.
-	Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*Observation, error)
+	Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*ResetResponse, error)
 	// Step executes one agent action and returns the resulting observation,
 	// reward, and done flag. Between agent turns, opponents play automatically.
 	Step(ctx context.Context, in *StepRequest, opts ...grpc.CallOption) (*StepResult, error)
@@ -47,9 +47,9 @@ func NewSkipBoEnvClient(cc grpc.ClientConnInterface) SkipBoEnvClient {
 	return &skipBoEnvClient{cc}
 }
 
-func (c *skipBoEnvClient) Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*Observation, error) {
+func (c *skipBoEnvClient) Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*ResetResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Observation)
+	out := new(ResetResponse)
 	err := c.cc.Invoke(ctx, SkipBoEnv_Reset_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (c *skipBoEnvClient) GetMetrics(ctx context.Context, in *MetricsRequest, op
 // SkipBoEnv exposes a Gym-style Step/Reset API for training RL agents.
 type SkipBoEnvServer interface {
 	// Reset starts a new game and returns the initial observation.
-	Reset(context.Context, *ResetRequest) (*Observation, error)
+	Reset(context.Context, *ResetRequest) (*ResetResponse, error)
 	// Step executes one agent action and returns the resulting observation,
 	// reward, and done flag. Between agent turns, opponents play automatically.
 	Step(context.Context, *StepRequest) (*StepResult, error)
@@ -100,7 +100,7 @@ type SkipBoEnvServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSkipBoEnvServer struct{}
 
-func (UnimplementedSkipBoEnvServer) Reset(context.Context, *ResetRequest) (*Observation, error) {
+func (UnimplementedSkipBoEnvServer) Reset(context.Context, *ResetRequest) (*ResetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Reset not implemented")
 }
 func (UnimplementedSkipBoEnvServer) Step(context.Context, *StepRequest) (*StepResult, error) {

@@ -3,8 +3,13 @@ package training
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"math/rand/v2"
+	"path/filepath"
 	"sync"
+	"time"
+	"github.com/google/uuid"
 
 	"github.com/RyanMcCrary22/skipbo/engine"
 	pb "github.com/RyanMcCrary22/skipbo/proto/skipbopb"
@@ -14,24 +19,32 @@ import (
 // Training Server — gRPC service implementing the SkipBoEnv interface
 // ---------------------------------------------------------------------------
 
-// Server implements the SkipBoEnv gRPC service. It manages a single game
-// session at a time, bridging the external agent (Python PPO) to the engine.
+// GameSession holds the state and channels for a single isolated training game.
+type GameSession struct {
+	id            string
+	game          *engine.Game
+	obsCh         chan AgentObs
+	actionCh      chan int
+	gameDone      chan gameResult
+	pendingReward float64
+	cancel        context.CancelFunc
+	lastActive    time.Time
+	resources     []io.Closer
+}
+
+// Server implements the SkipBoEnv gRPC service. It maintains concurrent
+// game sessions uniquely identified by a combination of a GUID or ID.
 type Server struct {
 	pb.UnimplementedSkipBoEnvServer
 
-	mu sync.Mutex
+	mu sync.RWMutex
 
-	// Current game state.
-	game     *engine.Game
-	obsCh    chan AgentObs
-	actionCh chan int
-	gameDone chan gameResult
-
-	// Per-step reward accumulator (written by event observer, drained by Step).
-	pendingReward float64
+	// Active game sessions.
+	sessions map[string]*GameSession
 
 	// Metrics tracking.
-	metrics Metrics
+	metricsMu sync.Mutex
+	metrics   Metrics
 }
 
 // Metrics tracks cumulative training statistics.
@@ -53,10 +66,32 @@ type gameResult struct {
 
 // NewServer creates a new training server.
 func NewServer() *Server {
-	return &Server{
-		obsCh:    make(chan AgentObs, 1),
-		actionCh: make(chan int, 1),
-		gameDone: make(chan gameResult, 1),
+	srv := &Server{
+		sessions: make(map[string]*GameSession),
+	}
+	go srv.reapZombieSessions()
+	return srv
+}
+
+func (s *Server) reapZombieSessions() {
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
+		s.mu.Lock()
+		for id, sess := range s.sessions {
+			if time.Since(sess.lastActive) > 10*time.Minute {
+				log.Printf("Reaping zombie game session: %s", id)
+				// Cleanly terminate the Game context.
+				if sess.cancel != nil {
+					sess.cancel()
+				}
+				// Force cleanup of ONNX or other resources.
+				for _, r := range sess.resources {
+					r.Close()
+				}
+				delete(s.sessions, id)
+			}
+		}
+		s.mu.Unlock()
 	}
 }
 
@@ -64,15 +99,18 @@ func NewServer() *Server {
 // Reset — start a new game
 // ---------------------------------------------------------------------------
 
-func (s *Server) Reset(_ context.Context, req *pb.ResetRequest) (*pb.Observation, error) {
+func (s *Server) Reset(_ context.Context, req *pb.ResetRequest) (*pb.ResetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Determine game parameters.
 	numOpponents := int(req.NumOpponents)
-	if numOpponents <= 0 {
+	if len(req.OpponentModels) > 0 {
+		numOpponents = len(req.OpponentModels)
+	} else if numOpponents <= 0 {
 		numOpponents = 1
 	}
+
 	stockSize := int(req.StockSize)
 	if stockSize < engine.MinStockSize || stockSize > engine.MaxStockSize {
 		stockSize = engine.DefaultStockSize
@@ -82,16 +120,39 @@ func (s *Server) Reset(_ context.Context, req *pb.ResetRequest) (*pb.Observation
 		seed = rand.Uint64()
 	}
 
-	// Create fresh channels for this game session.
-	s.obsCh = make(chan AgentObs, 1)
-	s.actionCh = make(chan int, 1)
-	s.gameDone = make(chan gameResult, 1)
+	// Create fresh channels and session.
+	sessionID := uuid.New().String()
+	ctx, cancel := context.WithCancel(context.Background())
+	sess := &GameSession{
+		id:         sessionID,
+		obsCh:      make(chan AgentObs, 1),
+		actionCh:   make(chan int, 1),
+		gameDone:   make(chan gameResult, 1),
+		cancel:     cancel,
+		lastActive: time.Now(),
+		resources:  []io.Closer{},
+	}
 
 	// Build players: agent at seat 0, random opponents after.
 	totalPlayers := 1 + numOpponents
 	players := make([]engine.Player, totalPlayers)
-	players[0] = NewAgentPlayer("PPO Agent", s.obsCh, s.actionCh)
+	players[0] = NewAgentPlayer("PPO Agent", sess.obsCh, sess.actionCh, ctx.Done())
+	
 	for i := 1; i < totalPlayers; i++ {
+		if len(req.OpponentModels) > 0 {
+			modelPath := req.OpponentModels[i-1]
+			if modelPath != "" && modelPath != "random" {
+				fullPath := filepath.Join("models", modelPath)
+				p, err := NewOnnxPlayer(fmt.Sprintf("ONNX %d", i), fullPath)
+				if err != nil {
+					cancel()
+					return nil, fmt.Errorf("failed to load onnx model %s: %w", modelPath, err)
+				}
+				sess.resources = append(sess.resources, p)
+				players[i] = p
+				continue
+			}
+		}
 		players[i] = engine.NewRandomPlayer(
 			fmt.Sprintf("Random %d", i),
 			rand.Uint64(),
@@ -111,39 +172,46 @@ func (s *Server) Reset(_ context.Context, req *pb.ResetRequest) (*pb.Observation
 
 	// Track stockpile plays, opponent progress, and illegal actions.
 	game.OnEvent(func(e engine.GameEvent) {
+		s.metricsMu.Lock()
+		defer s.metricsMu.Unlock()
+
 		switch {
 		case e.Type == engine.EventCardPlayed && e.Action != nil && e.PlayerIndex == 0:
 			// Agent played a card.
 			if e.Action.Source == engine.SourceStock {
-				s.pendingReward += 5.0 // Stockpile play: primary objective.
+				sess.pendingReward += 5.0 // Stockpile play: primary objective.
 				s.metrics.StockpilePlays++
 			} else {
-				s.pendingReward += 0.1 // Hand/discard play: keep the game moving.
+				sess.pendingReward += 0.1 // Hand/discard play: keep the game moving.
 			}
 		case e.Type == engine.EventCardPlayed && e.Action != nil &&
 			e.Action.Source == engine.SourceStock && e.PlayerIndex != 0:
 			// Opponent played from stockpile — agent should learn to block.
-			s.pendingReward -= 1.0
+			sess.pendingReward -= 1.0
 		case e.Type == engine.EventIllegalAction && e.PlayerIndex == 0:
 			s.metrics.IllegalActions++
 		}
 	})
 
-	s.game = game
+	sess.game = game
+	s.sessions[sessionID] = sess
 
 	// Run the game loop in a background goroutine.
 	// It will block whenever the AgentPlayer's ChooseAction is called,
 	// waiting for us to feed actions via actionCh.
 	go func() {
 		winner, err := game.Run()
-		s.gameDone <- gameResult{winner: winner, err: err}
+		sess.gameDone <- gameResult{winner: winner, err: err}
 	}()
 
 	// The game loop will immediately start the agent's first turn,
 	// draw cards, and call ChooseAction — which sends an obs to obsCh.
-	obs := <-s.obsCh
+	obs := <-sess.obsCh
 
-	return obsToProto(obs), nil
+	return &pb.ResetResponse{
+		SessionId: sessionID,
+		Obs:       obsToProto(obs),
+	}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -151,17 +219,24 @@ func (s *Server) Reset(_ context.Context, req *pb.ResetRequest) (*pb.Observation
 // ---------------------------------------------------------------------------
 
 func (s *Server) Step(_ context.Context, req *pb.StepRequest) (*pb.StepResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	sess, ok := s.sessions[req.SessionId]
+	s.mu.RUnlock()
 
-	if s.game == nil {
-		return nil, fmt.Errorf("no active game, call Reset first")
+	if !ok {
+		return nil, fmt.Errorf("invalid session id, call Reset first")
 	}
 
+	s.mu.Lock()
+	sess.lastActive = time.Now()
+	s.mu.Unlock()
+
+	s.metricsMu.Lock()
 	s.metrics.TotalSteps++
+	s.metricsMu.Unlock()
 
 	// Send the action to the agent player.
-	s.actionCh <- int(req.Action)
+	sess.actionCh <- int(req.Action)
 
 	// Now the game loop continues. It will either:
 	// 1. Call ChooseAction again (agent gets another move within this turn,
@@ -169,11 +244,14 @@ func (s *Server) Step(_ context.Context, req *pb.StepRequest) (*pb.StepResult, e
 	// 2. The game ends → result arrives on gameDone.
 
 	select {
-	case obs := <-s.obsCh:
+	case obs := <-sess.obsCh:
 		// Agent's next decision point. Drain accumulated reward.
-		view := s.game.BuildGameView(0)
-		reward := s.pendingReward
-		s.pendingReward = 0
+		s.metricsMu.Lock()
+		reward := sess.pendingReward
+		sess.pendingReward = 0
+		s.metricsMu.Unlock()
+
+		view := sess.game.BuildGameView(0)
 
 		return &pb.StepResult{
 			Obs:    obsToProto(obs),
@@ -181,16 +259,30 @@ func (s *Server) Step(_ context.Context, req *pb.StepRequest) (*pb.StepResult, e
 			Done:   false,
 			Winner: -1,
 			Info: &pb.StepInfo{
-				TurnNumber:          int32(s.game.TurnNumber()),
+				TurnNumber:          int32(sess.game.TurnNumber()),
 				AgentStockRemaining: int32(view.StockRemain),
 				PlayedFromStock:     reward >= 5.0,
 			},
 		}, nil
 
-	case result := <-s.gameDone:
+	case result := <-sess.gameDone:
+		s.mu.Lock()
+		delete(s.sessions, req.SessionId)
+		// Close context and models.
+		if sess.cancel != nil {
+			sess.cancel()
+		}
+		for _, r := range sess.resources {
+			r.Close()
+		}
+		s.mu.Unlock()
+
 		// Game is over.
+		s.metricsMu.Lock()
+		defer s.metricsMu.Unlock()
+
 		s.metrics.TotalGames++
-		s.metrics.TotalTurns += int64(s.game.TurnNumber())
+		s.metrics.TotalTurns += int64(sess.game.TurnNumber())
 		s.metrics.GamesForAvg++
 
 		winner := result.winner
@@ -199,8 +291,7 @@ func (s *Server) Step(_ context.Context, req *pb.StepRequest) (*pb.StepResult, e
 		}
 
 		// Terminal reward: large bonus/penalty + any pending shaped reward.
-		reward := s.pendingReward
-		s.pendingReward = 0
+		reward := sess.pendingReward
 		if winner == 0 {
 			reward += 100.0
 		} else {
@@ -213,15 +304,13 @@ func (s *Server) Step(_ context.Context, req *pb.StepRequest) (*pb.StepResult, e
 			ActionMask: make([]bool, engine.TotalActions),
 		}
 
-		s.game = nil // Clear the session.
-
 		return &pb.StepResult{
 			Obs:    termObs,
 			Reward: reward,
 			Done:   true,
 			Winner: int32(winner),
 			Info: &pb.StepInfo{
-				TurnNumber: int32(s.metrics.TotalTurns),
+				TurnNumber: int32(sess.game.TurnNumber()),
 			},
 		}, nil
 	}

@@ -28,12 +28,14 @@ class SkipBoEnv(gym.Env):
         server_addr: str = "localhost:50051",
         num_opponents: int = 1,
         stock_size: int = 30,
+        opponent_models: list | None = None,
     ):
         super().__init__()
 
         self.server_addr = server_addr
         self.num_opponents = num_opponents
         self.stock_size = stock_size
+        self.opponent_models = opponent_models if opponent_models else []
 
         # Connect to the Go training server.
         self.channel = grpc.insecure_channel(server_addr)
@@ -48,6 +50,8 @@ class SkipBoEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(ACTION_DIM)
 
         self._current_mask = np.ones(ACTION_DIM, dtype=bool)
+        self._game_over = True  # Force reset on first step.
+        self._session_id = ""
 
     def reset(self, seed=None, options=None):
         """Start a new game and return the initial observation."""
@@ -58,17 +62,31 @@ class SkipBoEnv(gym.Env):
             num_opponents=self.num_opponents,
             stock_size=self.stock_size,
         )
-        obs_proto = self.stub.Reset(req)
+        if self.opponent_models:
+            req.opponent_models.extend(self.opponent_models)
+            
+        resp = self.stub.Reset(req)
 
-        obs = np.array(obs_proto.state, dtype=np.float32)
-        self._current_mask = np.array(obs_proto.action_mask, dtype=bool)
+        self._session_id = resp.session_id
+        obs = np.array(resp.obs.state, dtype=np.float32)
+        self._current_mask = np.array(resp.obs.action_mask, dtype=bool)
+        self._game_over = False
 
         info = {"action_mask": self._current_mask}
         return obs, info
 
     def step(self, action: int):
         """Execute an action and return (obs, reward, terminated, truncated, info)."""
-        req = skipbo_pb2.StepRequest(action=action)
+        # SB3's VecEnv may call step after done without calling reset first.
+        # Auto-reset to keep the training loop running.
+        if self._game_over or not self._session_id:
+            obs, info = self.reset()
+            return obs, 0.0, False, False, info
+
+        req = skipbo_pb2.StepRequest(
+            session_id=self._session_id,
+            action=action
+        )
         result = self.stub.Step(req)
 
         obs = np.array(result.obs.state, dtype=np.float32)
@@ -77,6 +95,9 @@ class SkipBoEnv(gym.Env):
         reward = result.reward
         terminated = result.done
         truncated = False  # We don't truncate games.
+
+        if terminated:
+            self._game_over = True
 
         info = {
             "action_mask": self._current_mask,
@@ -97,3 +118,4 @@ class SkipBoEnv(gym.Env):
         """Clean up the gRPC channel."""
         if self.channel:
             self.channel.close()
+

@@ -36,6 +36,7 @@ try:
         BaseCallback,
         CheckpointCallback,
     )
+    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 except ImportError:
     print("ERROR: sb3_contrib not installed. Run: pip install -r requirements.txt")
     sys.exit(1)
@@ -58,6 +59,7 @@ class EvalAndLogCallback(BaseCallback):
         n_eval_games: int = 100,
         run_dir: str = "runs/default",
         server_addr: str = "localhost:50051",
+        opponent_models: list | None = None,
         verbose: int = 1,
     ):
         super().__init__(verbose)
@@ -67,6 +69,7 @@ class EvalAndLogCallback(BaseCallback):
         self.checkpoints_dir = self.run_dir / "checkpoints"
         self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
         self.server_addr = server_addr
+        self.opponent_models = opponent_models if opponent_models else []
         self.eval_history = []
 
     def _on_step(self) -> bool:
@@ -76,7 +79,7 @@ class EvalAndLogCallback(BaseCallback):
 
     def _evaluate(self):
         """Run N games and compute win rate."""
-        env = SkipBoEnv(server_addr=self.server_addr)
+        env = SkipBoEnv(server_addr=self.server_addr, opponent_models=self.opponent_models)
         wins = 0
         total_turns = 0
         total_stock_plays = 0
@@ -178,6 +181,8 @@ def main():
                         help="Total training timesteps")
     parser.add_argument("--server", type=str, default="localhost:50051",
                         help="gRPC server address")
+    parser.add_argument("--procs", type=int, default=1,
+                        help="Number of parallel environment processes")
     parser.add_argument("--eval-freq", type=int, default=50_000,
                         help="Evaluate every N steps")
     parser.add_argument("--eval-games", type=int, default=100,
@@ -193,9 +198,13 @@ def main():
     parser.add_argument("--n-epochs", type=int, default=10,
                         help="PPO epochs per rollout")
     parser.add_argument("--opponents", type=int, default=1,
-                        help="Number of random opponents")
+                        help="Number of random opponents (overridden by --opponent-models)")
+    parser.add_argument("--opponent-models", type=str, default="",
+                        help="Comma-separated list of opponent model names (e.g. random,v4_28M.onnx)")
     parser.add_argument("--stock-size", type=int, default=30,
                         help="Stock pile size")
+    parser.add_argument("--load", type=str, default=None,
+                        help="Path to an existing model.zip to resume training from")
     args = parser.parse_args()
 
     # Create run directory.
@@ -207,31 +216,57 @@ def main():
     print(f"   Run ID:     {run_id}")
     print(f"   Server:     {args.server}")
     print(f"   Timesteps:  {args.timesteps:,}")
+    if args.load:
+        print(f"   Loading:    {args.load}")
     print(f"   Network:    {args.hidden}")
     print(f"   LR:         {args.lr}")
     print(f"   Run dir:    {run_dir}")
     print()
 
+    # Parse opponent models
+    opponent_models_list = args.opponent_models.split(",") if args.opponent_models else []
+
     # Create environment.
-    env = SkipBoEnv(
-        server_addr=args.server,
-        num_opponents=args.opponents,
-        stock_size=args.stock_size,
-    )
-    env = ActionMasker(env, mask_fn)
+    def make_env():
+        def _init():
+            env_instance = SkipBoEnv(
+                server_addr=args.server,
+                num_opponents=args.opponents,
+                stock_size=args.stock_size,
+                opponent_models=opponent_models_list,
+            )
+            return ActionMasker(env_instance, mask_fn)
+        return _init
+
+    if args.procs > 1:
+        print(f"   Using {args.procs} parallel environment processes")
+        env = SubprocVecEnv([make_env() for _ in range(args.procs)])
+    else:
+        env = DummyVecEnv([make_env()])
 
     # Create PPO agent.
-    model = MaskablePPO(
-        "MlpPolicy",
-        env,
-        learning_rate=args.lr,
-        n_steps=args.n_steps,
-        batch_size=args.batch_size,
-        n_epochs=args.n_epochs,
-        policy_kwargs={"net_arch": args.hidden},
-        tensorboard_log=str(run_dir / "tensorboard"),
-        verbose=1,
-    )
+    if args.load:
+        # Load existing model but keep the new environment and tensorboard logger
+        print(f"Loading existing model from {args.load}...")
+        model = MaskablePPO.load(
+            args.load,
+            env=env,
+            learning_rate=args.lr,
+            tensorboard_log=str(run_dir / "tensorboard"),
+            custom_objects={"n_steps": args.n_steps, "batch_size": args.batch_size, "n_epochs": args.n_epochs}
+        )
+    else:
+        model = MaskablePPO(
+            "MlpPolicy",
+            env,
+            learning_rate=args.lr,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            policy_kwargs={"net_arch": args.hidden},
+            tensorboard_log=str(run_dir / "tensorboard"),
+            verbose=1,
+        )
 
     # Callbacks.
     eval_callback = EvalAndLogCallback(
@@ -239,15 +274,19 @@ def main():
         n_eval_games=args.eval_games,
         run_dir=str(run_dir),
         server_addr=args.server,
+        opponent_models=opponent_models_list,
     )
 
     # Train!
     start_time = time.time()
-    model.learn(
-        total_timesteps=args.timesteps,
-        callback=eval_callback,
-        tb_log_name="ppo",
-    )
+    try:
+        model.learn(
+            total_timesteps=args.timesteps,
+            callback=eval_callback,
+            tb_log_name="ppo",
+        )
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user. Saving early...")
     wall_clock = time.time() - start_time
 
     # Save final model.

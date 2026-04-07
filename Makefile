@@ -1,4 +1,4 @@
-.PHONY: test test-race test-unit bench play-gui play-cli simulate
+.PHONY: test test-race test-unit bench play-gui play-cli simulate proto train train-server eval export-onnx
 
 # Run all the unit and integration tests
 test:
@@ -38,7 +38,7 @@ proto:
 	protoc --go_out=proto/skipbopb --go_opt=paths=source_relative \
 	       --go-grpc_out=proto/skipbopb --go-grpc_opt=paths=source_relative \
 	       -I proto proto/skipbo.proto
-	python3 -m grpc_tools.protoc --python_out=python/ --grpc_python_out=python/ \
+	.venv/bin/python -m grpc_tools.protoc --python_out=python/ --grpc_python_out=python/ \
 	       -I proto proto/skipbo.proto
 
 # Start the gRPC training server (Go)
@@ -46,9 +46,24 @@ train-server:
 	go run ./cmd/train/ --port 50051
 
 # Run PPO training (Python) — start the server first with `make train-server`
+# Optional: Set total steps with STEPS=... (default: 500000)
+# Optional: Set number of processes with PROCS=... (default: 1)
+# Optional: Resume training from an existing model with `make train LOAD=path/to/model.zip`
+STEPS ?= 500000
+PROCS ?= 1
+OPPONENTS ?= 1
+OPPONENT_MODELS ?= ""
 train:
-	cd python && python3 train.py --timesteps 500000
+	@if [ -n "$(LOAD)" ]; then \
+		cd python && ../.venv/bin/python train.py --timesteps $(STEPS) --procs $(PROCS) --opponents $(OPPONENTS) --opponent-models $(OPPONENT_MODELS) --load $(LOAD); \
+	else \
+		cd python && ../.venv/bin/python train.py --timesteps $(STEPS) --procs $(PROCS) --opponents $(OPPONENTS) --opponent-models $(OPPONENT_MODELS); \
+	fi
 
 # Evaluate a trained model — pass MODEL=path/to/model.zip
 eval:
-	cd python && python3 evaluate.py --model $(MODEL) --games 500
+	cd python && ../.venv/bin/python evaluate.py --model $(MODEL) --games 500
+
+# Export a trained model to ONNX format
+export-onnx:
+	cd python && ../.venv/bin/python export_onnx.py --model ../models/v4_28M.zip --output ../models/v4_28M.onnx

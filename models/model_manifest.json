@@ -1,0 +1,41 @@
+{
+  "description": "Versioned Skip-Bo PPO agent models, trained against random opponents in 2-player games",
+  "training_run": "2026-04-04_09-33-50",
+  "base_checkpoint": "7.6M steps from overnight run 2026-04-04_02-01-15",
+  "models": [
+    {
+      "version": "v1",
+      "file": "v1_baseline_1M.zip",
+      "steps": 1000000,
+      "win_rate": 0.43,
+      "avg_game_length": 87.09,
+      "avg_stockpile_plays": 25.04,
+      "notes": "Baseline inference player. Already plays competently."
+    },
+    {
+      "version": "v2",
+      "file": "v2_10M.zip",
+      "steps": 10000000,
+      "win_rate": 0.57,
+      "avg_game_length": 87.67,
+      "avg_stockpile_plays": 25.98,
+      "notes": "Peak observed win rate at 10M steps."
+    },
+    {
+      "version": "v3",
+      "file": "v3_20M.zip",
+      "steps": 20000000,
+      "win_rate": 0.53,
+      "avg_game_length": 85.91,
+      "avg_stockpile_plays": 26.65,
+      "notes": "Plateau region. Best stockpile efficiency."
+    },
+    {
+      "version": "v4",
+      "file": "v4_28M.zip",
+      "steps": 28350000,
+      "win_rate": 0.53,
+      "notes": "Final model from crashed training run before M1 caffeinate timeout."
+    }
+  ]
+}

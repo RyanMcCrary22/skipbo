@@ -272,6 +272,19 @@ func (g *Game) PlayTurn() error {
 		return ErrGameOver
 	}
 
+	// Prevent poorly-trained agents from causing infinite discard loops.
+	// If a game exceeds 1000 turns, declare it a tie and end gracefully.
+	if g.turnNumber >= 1000 {
+		g.gameOver = true
+		g.winner = -1
+		g.emit(GameEvent{
+			Type:        EventGameOver,
+			PlayerIndex: -1,
+			Message:     "Game ended in a draw (turn limit reached)",
+		})
+		return nil
+	}
+
 	ps := &g.players[g.currentPlayer]
 	g.hasDiscarded = false
 	g.turnNumber++

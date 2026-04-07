@@ -23,7 +23,18 @@ import (
 
 func main() {
 	port := flag.Int("port", 50051, "gRPC server port")
+	onnxLib := flag.String("onnx-lib", "", "Path to libonnxruntime.dylib or .so (required for ONNX opponents)")
 	flag.Parse()
+
+	if *onnxLib != "" {
+		log.Printf("Initializing ONNX runtime from %s...", *onnxLib)
+		if err := training.InitOnnxRuntime(*onnxLib); err != nil {
+			log.Fatalf("Failed to initialize ONNX: %v", err)
+		}
+		defer training.DestroyOnnxRuntime()
+	} else {
+		log.Printf("Warning: --onnx-lib not provided. ONNX opponents will fail to load.")
+	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {

@@ -38,7 +38,7 @@ class SkipBoEnvStub(object):
         self.Reset = channel.unary_unary(
                 '/skipbo.SkipBoEnv/Reset',
                 request_serializer=skipbo__pb2.ResetRequest.SerializeToString,
-                response_deserializer=skipbo__pb2.Observation.FromString,
+                response_deserializer=skipbo__pb2.ResetResponse.FromString,
                 _registered_method=True)
         self.Step = channel.unary_unary(
                 '/skipbo.SkipBoEnv/Step',
@@ -84,7 +84,7 @@ def add_SkipBoEnvServicer_to_server(servicer, server):
             'Reset': grpc.unary_unary_rpc_method_handler(
                     servicer.Reset,
                     request_deserializer=skipbo__pb2.ResetRequest.FromString,
-                    response_serializer=skipbo__pb2.Observation.SerializeToString,
+                    response_serializer=skipbo__pb2.ResetResponse.SerializeToString,
             ),
             'Step': grpc.unary_unary_rpc_method_handler(
                     servicer.Step,
@@ -124,7 +124,7 @@ class SkipBoEnv(object):
             target,
             '/skipbo.SkipBoEnv/Reset',
             skipbo__pb2.ResetRequest.SerializeToString,
-            skipbo__pb2.Observation.FromString,
+            skipbo__pb2.ResetResponse.FromString,
             options,
             channel_credentials,
             insecure,

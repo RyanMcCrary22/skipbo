@@ -38,4 +38,7 @@ dist/
 .venv/
 __pycache__/
 *.pyc
+
+# Training runs (raw checkpoints — use models/ for versioned models)
+runs/
 python/runs/

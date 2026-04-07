@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cskipbo.proto\x12\x06skipbo\"G\n\x0cResetRequest\x12\x0c\n\x04seed\x18\x01 \x01(\x04\x12\x15\n\rnum_opponents\x18\x02 \x01(\x05\x12\x12\n\nstock_size\x18\x03 \x01(\x05\"\x1d\n\x0bStepRequest\x12\x0e\n\x06\x61\x63tion\x18\x01 \x01(\x05\"1\n\x0bObservation\x12\r\n\x05state\x18\x01 \x03(\x01\x12\x13\n\x0b\x61\x63tion_mask\x18\x02 \x03(\x08\"|\n\nStepResult\x12 \n\x03obs\x18\x01 \x01(\x0b\x32\x13.skipbo.Observation\x12\x0e\n\x06reward\x18\x02 \x01(\x01\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\x12\x0e\n\x06winner\x18\x04 \x01(\x05\x12\x1e\n\x04info\x18\x05 \x01(\x0b\x32\x10.skipbo.StepInfo\"Y\n\x08StepInfo\x12\x13\n\x0bturn_number\x18\x01 \x01(\x05\x12\x1d\n\x15\x61gent_stock_remaining\x18\x02 \x01(\x05\x12\x19\n\x11played_from_stock\x18\x03 \x01(\x08\"\x10\n\x0eMetricsRequest\"\x9e\x01\n\x0fMetricsResponse\x12\x13\n\x0btotal_games\x18\x01 \x01(\x03\x12\x13\n\x0btotal_steps\x18\x02 \x01(\x03\x12\x12\n\nagent_wins\x18\x03 \x01(\x03\x12\x17\n\x0f\x61vg_game_length\x18\x04 \x01(\x01\x12\x1b\n\x13\x61vg_stockpile_plays\x18\x05 \x01(\x01\x12\x17\n\x0fillegal_actions\x18\x06 \x01(\x03\x32\xaf\x01\n\tSkipBoEnv\x12\x32\n\x05Reset\x12\x14.skipbo.ResetRequest\x1a\x13.skipbo.Observation\x12/\n\x04Step\x12\x13.skipbo.StepRequest\x1a\x12.skipbo.StepResult\x12=\n\nGetMetrics\x12\x16.skipbo.MetricsRequest\x1a\x17.skipbo.MetricsResponseB0Z.github.com/RyanMcCrary22/skipbo/proto/skipbopbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cskipbo.proto\x12\x06skipbo\"`\n\x0cResetRequest\x12\x0c\n\x04seed\x18\x01 \x01(\x04\x12\x15\n\rnum_opponents\x18\x02 \x01(\x05\x12\x12\n\nstock_size\x18\x03 \x01(\x05\x12\x17\n\x0fopponent_models\x18\x04 \x03(\t\"E\n\rResetResponse\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12 \n\x03obs\x18\x02 \x01(\x0b\x32\x13.skipbo.Observation\"1\n\x0bStepRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63tion\x18\x02 \x01(\x05\"1\n\x0bObservation\x12\r\n\x05state\x18\x01 \x03(\x01\x12\x13\n\x0b\x61\x63tion_mask\x18\x02 \x03(\x08\"|\n\nStepResult\x12 \n\x03obs\x18\x01 \x01(\x0b\x32\x13.skipbo.Observation\x12\x0e\n\x06reward\x18\x02 \x01(\x01\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\x12\x0e\n\x06winner\x18\x04 \x01(\x05\x12\x1e\n\x04info\x18\x05 \x01(\x0b\x32\x10.skipbo.StepInfo\"Y\n\x08StepInfo\x12\x13\n\x0bturn_number\x18\x01 \x01(\x05\x12\x1d\n\x15\x61gent_stock_remaining\x18\x02 \x01(\x05\x12\x19\n\x11played_from_stock\x18\x03 \x01(\x08\"\x10\n\x0eMetricsRequest\"\x9e\x01\n\x0fMetricsResponse\x12\x13\n\x0btotal_games\x18\x01 \x01(\x03\x12\x13\n\x0btotal_steps\x18\x02 \x01(\x03\x12\x12\n\nagent_wins\x18\x03 \x01(\x03\x12\x17\n\x0f\x61vg_game_length\x18\x04 \x01(\x01\x12\x1b\n\x13\x61vg_stockpile_plays\x18\x05 \x01(\x01\x12\x17\n\x0fillegal_actions\x18\x06 \x01(\x03\x32\xb1\x01\n\tSkipBoEnv\x12\x34\n\x05Reset\x12\x14.skipbo.ResetRequest\x1a\x15.skipbo.ResetResponse\x12/\n\x04Step\x12\x13.skipbo.StepRequest\x1a\x12.skipbo.StepResult\x12=\n\nGetMetrics\x12\x16.skipbo.MetricsRequest\x1a\x17.skipbo.MetricsResponseB0Z.github.com/RyanMcCrary22/skipbo/proto/skipbopbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,19 +33,21 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z.github.com/RyanMcCrary22/skipbo/proto/skipbopb'
   _globals['_RESETREQUEST']._serialized_start=24
-  _globals['_RESETREQUEST']._serialized_end=95
-  _globals['_STEPREQUEST']._serialized_start=97
-  _globals['_STEPREQUEST']._serialized_end=126
-  _globals['_OBSERVATION']._serialized_start=128
-  _globals['_OBSERVATION']._serialized_end=177
-  _globals['_STEPRESULT']._serialized_start=179
-  _globals['_STEPRESULT']._serialized_end=303
-  _globals['_STEPINFO']._serialized_start=305
-  _globals['_STEPINFO']._serialized_end=394
-  _globals['_METRICSREQUEST']._serialized_start=396
-  _globals['_METRICSREQUEST']._serialized_end=412
-  _globals['_METRICSRESPONSE']._serialized_start=415
-  _globals['_METRICSRESPONSE']._serialized_end=573
-  _globals['_SKIPBOENV']._serialized_start=576
-  _globals['_SKIPBOENV']._serialized_end=751
+  _globals['_RESETREQUEST']._serialized_end=120
+  _globals['_RESETRESPONSE']._serialized_start=122
+  _globals['_RESETRESPONSE']._serialized_end=191
+  _globals['_STEPREQUEST']._serialized_start=193
+  _globals['_STEPREQUEST']._serialized_end=242
+  _globals['_OBSERVATION']._serialized_start=244
+  _globals['_OBSERVATION']._serialized_end=293
+  _globals['_STEPRESULT']._serialized_start=295
+  _globals['_STEPRESULT']._serialized_end=419
+  _globals['_STEPINFO']._serialized_start=421
+  _globals['_STEPINFO']._serialized_end=510
+  _globals['_METRICSREQUEST']._serialized_start=512
+  _globals['_METRICSREQUEST']._serialized_end=528
+  _globals['_METRICSRESPONSE']._serialized_start=531
+  _globals['_METRICSRESPONSE']._serialized_end=689
+  _globals['_SKIPBOENV']._serialized_start=692
+  _globals['_SKIPBOENV']._serialized_end=869
 # @@protoc_insertion_point(module_scope)

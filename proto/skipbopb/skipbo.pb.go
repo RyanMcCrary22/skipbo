@@ -28,9 +28,11 @@ type ResetRequest struct {
 	// Number of opponents (default 1 if not set).
 	NumOpponents int32 `protobuf:"varint,2,opt,name=num_opponents,json=numOpponents,proto3" json:"num_opponents,omitempty"`
 	// Stock pile size (default 30 if not set).
-	StockSize     int32 `protobuf:"varint,3,opt,name=stock_size,json=stockSize,proto3" json:"stock_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	StockSize int32 `protobuf:"varint,3,opt,name=stock_size,json=stockSize,proto3" json:"stock_size,omitempty"`
+	// Optional list of opponent model names. If provided, overrides num_opponents.
+	OpponentModels []string `protobuf:"bytes,4,rep,name=opponent_models,json=opponentModels,proto3" json:"opponent_models,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ResetRequest) Reset() {
@@ -84,17 +86,77 @@ func (x *ResetRequest) GetStockSize() int32 {
 	return 0
 }
 
+func (x *ResetRequest) GetOpponentModels() []string {
+	if x != nil {
+		return x.OpponentModels
+	}
+	return nil
+}
+
+type ResetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Obs           *Observation           `protobuf:"bytes,2,opt,name=obs,proto3" json:"obs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetResponse) Reset() {
+	*x = ResetResponse{}
+	mi := &file_skipbo_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetResponse) ProtoMessage() {}
+
+func (x *ResetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_skipbo_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetResponse.ProtoReflect.Descriptor instead.
+func (*ResetResponse) Descriptor() ([]byte, []int) {
+	return file_skipbo_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ResetResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ResetResponse) GetObs() *Observation {
+	if x != nil {
+		return x.Obs
+	}
+	return nil
+}
+
 type StepRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Discrete action index (0–59).
-	Action        int32 `protobuf:"varint,1,opt,name=action,proto3" json:"action,omitempty"`
+	Action        int32 `protobuf:"varint,2,opt,name=action,proto3" json:"action,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StepRequest) Reset() {
 	*x = StepRequest{}
-	mi := &file_skipbo_proto_msgTypes[1]
+	mi := &file_skipbo_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -106,7 +168,7 @@ func (x *StepRequest) String() string {
 func (*StepRequest) ProtoMessage() {}
 
 func (x *StepRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[1]
+	mi := &file_skipbo_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -119,7 +181,14 @@ func (x *StepRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepRequest.ProtoReflect.Descriptor instead.
 func (*StepRequest) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{1}
+	return file_skipbo_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StepRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
 }
 
 func (x *StepRequest) GetAction() int32 {
@@ -141,7 +210,7 @@ type Observation struct {
 
 func (x *Observation) Reset() {
 	*x = Observation{}
-	mi := &file_skipbo_proto_msgTypes[2]
+	mi := &file_skipbo_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -153,7 +222,7 @@ func (x *Observation) String() string {
 func (*Observation) ProtoMessage() {}
 
 func (x *Observation) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[2]
+	mi := &file_skipbo_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -166,7 +235,7 @@ func (x *Observation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Observation.ProtoReflect.Descriptor instead.
 func (*Observation) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{2}
+	return file_skipbo_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Observation) GetState() []float64 {
@@ -201,7 +270,7 @@ type StepResult struct {
 
 func (x *StepResult) Reset() {
 	*x = StepResult{}
-	mi := &file_skipbo_proto_msgTypes[3]
+	mi := &file_skipbo_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -213,7 +282,7 @@ func (x *StepResult) String() string {
 func (*StepResult) ProtoMessage() {}
 
 func (x *StepResult) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[3]
+	mi := &file_skipbo_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -226,7 +295,7 @@ func (x *StepResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepResult.ProtoReflect.Descriptor instead.
 func (*StepResult) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{3}
+	return file_skipbo_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StepResult) GetObs() *Observation {
@@ -275,7 +344,7 @@ type StepInfo struct {
 
 func (x *StepInfo) Reset() {
 	*x = StepInfo{}
-	mi := &file_skipbo_proto_msgTypes[4]
+	mi := &file_skipbo_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +356,7 @@ func (x *StepInfo) String() string {
 func (*StepInfo) ProtoMessage() {}
 
 func (x *StepInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[4]
+	mi := &file_skipbo_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +369,7 @@ func (x *StepInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfo.ProtoReflect.Descriptor instead.
 func (*StepInfo) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{4}
+	return file_skipbo_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StepInfo) GetTurnNumber() int32 {
@@ -332,7 +401,7 @@ type MetricsRequest struct {
 
 func (x *MetricsRequest) Reset() {
 	*x = MetricsRequest{}
-	mi := &file_skipbo_proto_msgTypes[5]
+	mi := &file_skipbo_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -344,7 +413,7 @@ func (x *MetricsRequest) String() string {
 func (*MetricsRequest) ProtoMessage() {}
 
 func (x *MetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[5]
+	mi := &file_skipbo_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -357,7 +426,7 @@ func (x *MetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricsRequest.ProtoReflect.Descriptor instead.
 func (*MetricsRequest) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{5}
+	return file_skipbo_proto_rawDescGZIP(), []int{6}
 }
 
 type MetricsResponse struct {
@@ -374,7 +443,7 @@ type MetricsResponse struct {
 
 func (x *MetricsResponse) Reset() {
 	*x = MetricsResponse{}
-	mi := &file_skipbo_proto_msgTypes[6]
+	mi := &file_skipbo_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -386,7 +455,7 @@ func (x *MetricsResponse) String() string {
 func (*MetricsResponse) ProtoMessage() {}
 
 func (x *MetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_skipbo_proto_msgTypes[6]
+	mi := &file_skipbo_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -399,7 +468,7 @@ func (x *MetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricsResponse.ProtoReflect.Descriptor instead.
 func (*MetricsResponse) Descriptor() ([]byte, []int) {
-	return file_skipbo_proto_rawDescGZIP(), []int{6}
+	return file_skipbo_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MetricsResponse) GetTotalGames() int64 {
@@ -448,14 +517,21 @@ var File_skipbo_proto protoreflect.FileDescriptor
 
 const file_skipbo_proto_rawDesc = "" +
 	"\n" +
-	"\fskipbo.proto\x12\x06skipbo\"f\n" +
+	"\fskipbo.proto\x12\x06skipbo\"\x8f\x01\n" +
 	"\fResetRequest\x12\x12\n" +
 	"\x04seed\x18\x01 \x01(\x04R\x04seed\x12#\n" +
 	"\rnum_opponents\x18\x02 \x01(\x05R\fnumOpponents\x12\x1d\n" +
 	"\n" +
-	"stock_size\x18\x03 \x01(\x05R\tstockSize\"%\n" +
-	"\vStepRequest\x12\x16\n" +
-	"\x06action\x18\x01 \x01(\x05R\x06action\"D\n" +
+	"stock_size\x18\x03 \x01(\x05R\tstockSize\x12'\n" +
+	"\x0fopponent_models\x18\x04 \x03(\tR\x0eopponentModels\"U\n" +
+	"\rResetResponse\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12%\n" +
+	"\x03obs\x18\x02 \x01(\v2\x13.skipbo.ObservationR\x03obs\"D\n" +
+	"\vStepRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\x05R\x06action\"D\n" +
 	"\vObservation\x12\x14\n" +
 	"\x05state\x18\x01 \x03(\x01R\x05state\x12\x1f\n" +
 	"\vaction_mask\x18\x02 \x03(\bR\n" +
@@ -482,9 +558,9 @@ const file_skipbo_proto_rawDesc = "" +
 	"agent_wins\x18\x03 \x01(\x03R\tagentWins\x12&\n" +
 	"\x0favg_game_length\x18\x04 \x01(\x01R\ravgGameLength\x12.\n" +
 	"\x13avg_stockpile_plays\x18\x05 \x01(\x01R\x11avgStockpilePlays\x12'\n" +
-	"\x0fillegal_actions\x18\x06 \x01(\x03R\x0eillegalActions2\xaf\x01\n" +
-	"\tSkipBoEnv\x122\n" +
-	"\x05Reset\x12\x14.skipbo.ResetRequest\x1a\x13.skipbo.Observation\x12/\n" +
+	"\x0fillegal_actions\x18\x06 \x01(\x03R\x0eillegalActions2\xb1\x01\n" +
+	"\tSkipBoEnv\x124\n" +
+	"\x05Reset\x12\x14.skipbo.ResetRequest\x1a\x15.skipbo.ResetResponse\x12/\n" +
 	"\x04Step\x12\x13.skipbo.StepRequest\x1a\x12.skipbo.StepResult\x12=\n" +
 	"\n" +
 	"GetMetrics\x12\x16.skipbo.MetricsRequest\x1a\x17.skipbo.MetricsResponseB0Z.github.com/RyanMcCrary22/skipbo/proto/skipbopbb\x06proto3"
@@ -501,30 +577,32 @@ func file_skipbo_proto_rawDescGZIP() []byte {
 	return file_skipbo_proto_rawDescData
 }
 
-var file_skipbo_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_skipbo_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_skipbo_proto_goTypes = []any{
 	(*ResetRequest)(nil),    // 0: skipbo.ResetRequest
-	(*StepRequest)(nil),     // 1: skipbo.StepRequest
-	(*Observation)(nil),     // 2: skipbo.Observation
-	(*StepResult)(nil),      // 3: skipbo.StepResult
-	(*StepInfo)(nil),        // 4: skipbo.StepInfo
-	(*MetricsRequest)(nil),  // 5: skipbo.MetricsRequest
-	(*MetricsResponse)(nil), // 6: skipbo.MetricsResponse
+	(*ResetResponse)(nil),   // 1: skipbo.ResetResponse
+	(*StepRequest)(nil),     // 2: skipbo.StepRequest
+	(*Observation)(nil),     // 3: skipbo.Observation
+	(*StepResult)(nil),      // 4: skipbo.StepResult
+	(*StepInfo)(nil),        // 5: skipbo.StepInfo
+	(*MetricsRequest)(nil),  // 6: skipbo.MetricsRequest
+	(*MetricsResponse)(nil), // 7: skipbo.MetricsResponse
 }
 var file_skipbo_proto_depIdxs = []int32{
-	2, // 0: skipbo.StepResult.obs:type_name -> skipbo.Observation
-	4, // 1: skipbo.StepResult.info:type_name -> skipbo.StepInfo
-	0, // 2: skipbo.SkipBoEnv.Reset:input_type -> skipbo.ResetRequest
-	1, // 3: skipbo.SkipBoEnv.Step:input_type -> skipbo.StepRequest
-	5, // 4: skipbo.SkipBoEnv.GetMetrics:input_type -> skipbo.MetricsRequest
-	2, // 5: skipbo.SkipBoEnv.Reset:output_type -> skipbo.Observation
-	3, // 6: skipbo.SkipBoEnv.Step:output_type -> skipbo.StepResult
-	6, // 7: skipbo.SkipBoEnv.GetMetrics:output_type -> skipbo.MetricsResponse
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 0: skipbo.ResetResponse.obs:type_name -> skipbo.Observation
+	3, // 1: skipbo.StepResult.obs:type_name -> skipbo.Observation
+	5, // 2: skipbo.StepResult.info:type_name -> skipbo.StepInfo
+	0, // 3: skipbo.SkipBoEnv.Reset:input_type -> skipbo.ResetRequest
+	2, // 4: skipbo.SkipBoEnv.Step:input_type -> skipbo.StepRequest
+	6, // 5: skipbo.SkipBoEnv.GetMetrics:input_type -> skipbo.MetricsRequest
+	1, // 6: skipbo.SkipBoEnv.Reset:output_type -> skipbo.ResetResponse
+	4, // 7: skipbo.SkipBoEnv.Step:output_type -> skipbo.StepResult
+	7, // 8: skipbo.SkipBoEnv.GetMetrics:output_type -> skipbo.MetricsResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_skipbo_proto_init() }
@@ -538,7 +616,7 @@ func file_skipbo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_skipbo_proto_rawDesc), len(file_skipbo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

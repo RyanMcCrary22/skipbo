@@ -1,6 +1,8 @@
 package training
 
 import (
+	"fmt"
+
 	"github.com/RyanMcCrary22/skipbo/engine"
 )
 
@@ -23,6 +25,9 @@ type AgentPlayer struct {
 
 	// ActionCh receives the action index chosen by the remote agent.
 	ActionCh <-chan int
+	
+	// done is closed when the session is cancelled, unblocking the player.
+	done <-chan struct{}
 }
 
 // AgentObs bundles the state vector and action mask for one decision point.
@@ -32,11 +37,12 @@ type AgentObs struct {
 }
 
 // NewAgentPlayer creates an AgentPlayer with the given channel pair.
-func NewAgentPlayer(name string, obsCh chan<- AgentObs, actionCh <-chan int) *AgentPlayer {
+func NewAgentPlayer(name string, obsCh chan<- AgentObs, actionCh <-chan int, done <-chan struct{}) *AgentPlayer {
 	return &AgentPlayer{
 		name:     name,
 		ObsCh:    obsCh,
 		ActionCh: actionCh,
+		done:     done,
 	}
 }
 
@@ -54,10 +60,19 @@ func (p *AgentPlayer) ChooseAction(view *engine.GameView) (engine.Action, error)
 	}
 
 	// Send observation to the gRPC server goroutine.
-	p.ObsCh <- obs
+	select {
+	case p.ObsCh <- obs:
+	case <-p.done:
+		return engine.Action{}, fmt.Errorf("session cancelled")
+	}
 
 	// Block until the agent sends back an action index.
-	actionIdx := <-p.ActionCh
+	var actionIdx int
+	select {
+	case actionIdx = <-p.ActionCh:
+	case <-p.done:
+		return engine.Action{}, fmt.Errorf("session cancelled")
+	}
 
 	// Convert index to Action struct.
 	action, ok := engine.ActionFromIndex(actionIdx)
